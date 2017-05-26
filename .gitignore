@@ -1,3 +1,8 @@
 vendor/**
 !vendor/manifest
 .idea
+app.sh
+
+main
+cacert.pem
+ca-certificates.crt

@@ -6,6 +6,9 @@ import (
 	"os"
 	"bufio"
 	"strings"
+	"net/url"
+	"gopkg.in/Shopify/sarama.v1"
+	"log"
 )
 
 func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -36,29 +39,50 @@ func main() {
 	var token_secret = os.Getenv("ACCESS_TOKEN_SECRET")
 	var consumer_key = os.Getenv("CONSUMER_KEY")
 	var consumer_secret = os.Getenv("CONSUMER_SECRET")
-	//var tokens = os.Getenv("TOKENS")
+	var tokens = os.Getenv("TOKENS")
+	var kafka_servers = os.Getenv("KAFKA_SERVERS")
 
 	conf := oauth1.NewConfig(consumer_key, consumer_secret)
 	token := oauth1.NewToken(access_token, token_secret)
 	client := conf.Client(oauth1.NoContext, token)
-	stream_url := "https://stream.twitter.com/1.1/statuses/filter.json?track=Trump"
+	v := url.Values{}
+	v.Set("track", tokens)
 
-	resp, _ := client.Post(stream_url, "application/json", nil)
+	stream_url := "https://stream.twitter.com/1.1/statuses/filter.json?" + v.Encode()
+
+	resp, err := client.Post(stream_url, "application/json", nil)
+
+	if err != nil {
+		log.Fatalf("Error while connecting to twitter: %s", err)
+		panic(err)
+		return
+	}
+
+	if resp.StatusCode != 200 {
+		log.Fatalf("Error while connecting to twitter, status code returned: %d", resp.StatusCode)
+		panic(err)
+		return
+	}
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(scanLines)
 
-	count := 0
+	producer, err := sarama.NewAsyncProducer([]string{kafka_servers}, nil)
+
+	if err != nil {
+		log.Fatalf("Error while bootstraping Kafka producer: %s", err)
+		panic(err)
+		return
+	}
+
 	for scanner.Scan() {
 		token := scanner.Bytes()
 		if len(token) == 0 {
 			// empty keep-alive
 			continue
 		}
-		//println(string(token))
-		//println("-----------------------")
-		println(count)
-		count += 1
 
+		producer.Input() <- &sarama.ProducerMessage{Topic: "raw_tweets", Key: nil, Value: sarama.StringEncoder(token)}
+		log.Printf("Tweet received")
 	}
 }
