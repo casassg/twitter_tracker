@@ -1,5 +1,5 @@
 
-Needs: Go 1.8.3, GVT dependency manager
+Needs: Go 1.8.3, glide
 Install dependencies
 
-`gvt restore`
+`glide install`

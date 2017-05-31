@@ -1,0 +1,6 @@
+package: .
+import:
+- package: github.com/dghubble/oauth1
+  version: ~0.4.0
+- package: gopkg.in/Shopify/sarama.v1
+  version: ~1.12.0
