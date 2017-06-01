@@ -40,7 +40,7 @@ func main() {
 	var consumer_key = os.Getenv("CONSUMER_KEY")
 	var consumer_secret = os.Getenv("CONSUMER_SECRET")
 	var tokens = os.Getenv("TOKENS")
-	var kafka_servers = os.Getenv("KAFKA_SERVERS")
+	var kafka_servers = strings.Split(os.Getenv("KAFKA_SERVERS"),",")
 
 	conf := oauth1.NewConfig(consumer_key, consumer_secret)
 	token := oauth1.NewToken(access_token, token_secret)
@@ -67,7 +67,7 @@ func main() {
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(scanLines)
 
-	producer, err := sarama.NewAsyncProducer([]string{kafka_servers}, nil)
+	producer, err := sarama.NewAsyncProducer(kafka_servers, nil)
 
 	if err != nil {
 		log.Fatalf("Error while bootstraping Kafka producer: %s", err)
