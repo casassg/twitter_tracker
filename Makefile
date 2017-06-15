@@ -4,7 +4,7 @@ push: push
 
 # To bump the Zeppelin version, bump the version in
 # zeppelin/Dockerfile and bump this tag and reset to v1.
-TAG = 1.0.1
+TAG = 1.0.2
 PROJECT_NAME = twitter2kafka
 
 build: main ca-certificates.crt
