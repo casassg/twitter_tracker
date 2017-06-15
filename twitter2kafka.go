@@ -35,18 +35,6 @@ func dropCR(data []byte) []byte {
 }
 
 
-
-func scanTwitter(tweet chan <- []byte, scanner *bufio.Scanner) {
-	for scanner.Scan() {
-		token := scanner.Bytes()
-		if len(token) == 0 {
-			// empty keep-alive
-			continue
-		}
-		tweet <- token
-	}
-}
-
 func main() {
 	var access_token = os.Getenv("ACCESS_TOKEN")
 	var token_secret = os.Getenv("ACCESS_TOKEN_SECRET")
@@ -97,20 +85,23 @@ func main() {
 		return
 	}
 
-	tweets := make(chan []byte)
-	go scanTwitter(tweets,scanner)
 
-	ProducerLoop:
-	for {
-		select {
-		case token := <- tweets:
-			producer.Input() <- &sarama.ProducerMessage{Topic: "raw_tweets", Key: nil, Value: sarama.StringEncoder(token)}
-			log.Printf("Tweet received")
-		case err := <-producer.Errors():
-			log.Println("Failed to produce message", err)
-			break ProducerLoop
+	go func() {
+		for err := range producer.Errors() {
+			log.Fatalf("Error: %s", err)
+			os.Exit(2)
+		}
+	}()
+
+	for scanner.Scan() {
+		token := scanner.Bytes()
+		if len(token) == 0 {
+			// empty keep-alive
+			continue
 		}
 
+		producer.Input() <- &sarama.ProducerMessage{Topic: "raw_tweets", Key: nil, Value: sarama.StringEncoder(token)}
+		log.Printf("Tweet received")
 	}
 	log.Printf("Closing")
 

@@ -6,3 +6,4 @@ app.sh
 main
 cacert.pem
 ca-certificates.crt
+.DS_Store
