@@ -34,6 +34,19 @@ func dropCR(data []byte) []byte {
 	return data
 }
 
+
+
+func scanTwitter(tweet chan <- []byte, scanner *bufio.Scanner) {
+	for scanner.Scan() {
+		token := scanner.Bytes()
+		if len(token) == 0 {
+			// empty keep-alive
+			continue
+		}
+		tweet <- token
+	}
+}
+
 func main() {
 	var access_token = os.Getenv("ACCESS_TOKEN")
 	var token_secret = os.Getenv("ACCESS_TOKEN_SECRET")
@@ -47,6 +60,8 @@ func main() {
 	client := conf.Client(oauth1.NoContext, token)
 	v := url.Values{}
 	v.Set("track", tokens)
+
+
 
 	stream_url := "https://stream.twitter.com/1.1/statuses/filter.json?" + v.Encode()
 
@@ -69,20 +84,34 @@ func main() {
 
 	producer, err := sarama.NewAsyncProducer(kafka_servers, nil)
 
+	defer func() {
+		if err := producer.Close(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+
 	if err != nil {
 		log.Fatalf("Error while bootstraping Kafka producer: %s", err)
 		panic(err)
 		return
 	}
 
-	for scanner.Scan() {
-		token := scanner.Bytes()
-		if len(token) == 0 {
-			// empty keep-alive
-			continue
+	tweets := make(chan []byte)
+	go scanTwitter(tweets,scanner)
+
+	ProducerLoop:
+	for {
+		select {
+		case token := <- tweets:
+			producer.Input() <- &sarama.ProducerMessage{Topic: "raw_tweets", Key: nil, Value: sarama.StringEncoder(token)}
+			log.Printf("Tweet received")
+		case err := <-producer.Errors():
+			log.Println("Failed to produce message", err)
+			break ProducerLoop
 		}
 
-		producer.Input() <- &sarama.ProducerMessage{Topic: "raw_tweets", Key: nil, Value: sarama.StringEncoder(token)}
-		log.Printf("Tweet received")
 	}
+	log.Printf("Closing")
+
 }
